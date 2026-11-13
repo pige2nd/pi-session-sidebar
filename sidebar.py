@@ -707,6 +707,9 @@ def main():
     if args.action == "open":
         workspace.open(args.source or os.environ.get("TMUX_PANE"))
     elif args.action == "tui":
+        # tmux 的旧 terminfo 使用 X10 鼠标包，会丢失抬起时的按键身份。
+        # 仅本 pane 使用支持 SGR 鼠标协议的 terminfo，保留左右键区分。
+        os.environ["TERM"] = "xterm-256color"
         curses.wrapper(lambda screen: Sidebar(screen, workspace).run())
     else:
         getattr(workspace, args.action)()

@@ -105,6 +105,19 @@ class MouseResizeTest(unittest.TestCase):
             panel.event(sidebar.curses.KEY_MOUSE)
         panel.workspace.toggle.assert_called_once()
 
+    def test_right_release_opens_menu_without_switching_session(self):
+        panel = sidebar.Sidebar.__new__(sidebar.Sidebar)
+        panel.workspace = Mock()
+        panel.menu = None
+        panel.screen = Mock()
+        panel.screen.getmaxyx.return_value = (34, 28)
+        panel.hits = {10: ({"key": "test", "title": "会话"}, "title0")}
+        with patch.object(sidebar.os, "get_terminal_size", return_value=os.terminal_size((28, 34))), \
+             patch.object(sidebar.curses, "getmouse", return_value=(0, 6, 10, 0, sidebar.curses.BUTTON3_RELEASED)):
+            panel.event(sidebar.curses.KEY_MOUSE)
+        self.assertEqual(panel.menu["row"]["key"], "test")
+        panel.workspace.activate.assert_not_called()
+
 
 class TmuxTest(unittest.TestCase):
     @classmethod
@@ -167,6 +180,7 @@ for line in sys.stdin:
         fcntl.ioctl(cls.master, termios.TIOCSWINSZ, struct.pack("HHHH", 34, 120, 0, 0))
         cls.wait(lambda: bool(sidebar.tmux("list-clients", "-F", "#{client_tty}")))
         cls.wait(lambda: "全部会话" in cls.capture(cls.sidebar))
+        assert sidebar.tmux("display-message", "-p", "-t", cls.sidebar, "#{mouse_sgr_flag}") == "1"
 
     @classmethod
     def cleanup(cls):
