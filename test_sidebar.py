@@ -224,8 +224,10 @@ for line in sys.stdin:
         # 真正向附着的 tmux 客户端发送鼠标事件，验证转发与命中。
         self.click(21, 1)
         self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "3")
+        self.wait(lambda: self.capture(self.sidebar).splitlines()[0].strip() == ">")
         self.click(0, 0)
         self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "28")
+        self.wait(lambda: "全部会话" in self.capture(self.sidebar))
         os.write(self.master, b"\x1b[<65;6;7M")
         self.wait(lambda: "运行00" not in self.capture(self.sidebar))
         os.write(self.master, b"\x1b[<64;6;7M")
