@@ -619,6 +619,9 @@ class Sidebar:
         height, width = self.screen.getmaxyx()
         if key == curses.KEY_MOUSE:
             _, x, y, _, buttons = mouse
+            if os.environ.get("PI_SIDEBAR_DEBUG_MOUSE"):
+                with open(os.environ["PI_SIDEBAR_DEBUG_MOUSE"], "a") as log:
+                    log.write('[DEBUG-mouse] ' + repr((mouse, self.screen.getmaxyx(), bool(self.menu), self.hits.get(y))) + '\n')
             if self.menu:
                 self.menu_event(key, (x, y, buttons))
                 return
