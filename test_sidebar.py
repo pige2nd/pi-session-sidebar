@@ -195,7 +195,10 @@ for line in sys.stdin:
                               capture_output=True, text=True).stdout.rstrip("\n")
 
     def click(self, x, y, button=0):
-        os.write(self.master, f"\x1b[<{button};{x + 1};{y + 1}M\x1b[<{button};{x + 1};{y + 1}m".encode())
+        os.write(self.master, f"\x1b[<{button};{x + 1};{y + 1}M".encode())
+        time.sleep(0.1)
+        self.drain()
+        os.write(self.master, f"\x1b[<{button};{x + 1};{y + 1}m".encode())
         time.sleep(0.15)
         self.drain()
 
