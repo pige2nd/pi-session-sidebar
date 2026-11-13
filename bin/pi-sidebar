@@ -1,0 +1,6 @@
+#!/usr/bin/env python3
+"""从 checkout 或 package 的 bin 目录启动会话栏。"""
+from pathlib import Path
+import runpy
+
+runpy.run_path(str(Path(__file__).resolve().parent.parent / "sidebar.py"), run_name="__main__")

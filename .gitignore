@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+node_modules/
+*.jsonl
+*.log
+*.tgz
+pins.json
+titles.json
+restore.json
+.DS_Store
