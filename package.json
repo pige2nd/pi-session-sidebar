@@ -1,6 +1,6 @@
 {
   "name": "pi-session-sidebar",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "可折叠、可置顶的 Pi 会话左栏，保留原生终端",
   "license": "MIT",
   "author": "pige2nd",

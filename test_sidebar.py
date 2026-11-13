@@ -66,7 +66,7 @@ class MouseResizeTest(unittest.TestCase):
         dimensions = [34, 28]
         panel.screen = Mock()
         panel.screen.getmaxyx.side_effect = lambda: tuple(dimensions)
-        queue = [(0, 0, 0, 0, sidebar.curses.BUTTON1_CLICKED)]
+        queue = [(0, 1, 1, 0, sidebar.curses.BUTTON1_CLICKED)]
 
         def resize(height, width):
             dimensions[:] = [height, width]
@@ -100,7 +100,7 @@ class MouseResizeTest(unittest.TestCase):
         with patch.object(sidebar.os, "get_terminal_size", return_value=os.terminal_size((3, 34))), \
              patch.object(sidebar.curses, "getmouse", side_effect=[
                  sidebar.curses.error("getmouse() returned ERR"),
-                 (0, 0, 0, 0, sidebar.curses.BUTTON1_RELEASED)]):
+                 (0, 1, 1, 0, sidebar.curses.BUTTON1_RELEASED)]):
             panel.event(sidebar.curses.KEY_MOUSE)
             panel.event(sidebar.curses.KEY_MOUSE)
         panel.workspace.toggle.assert_called_once()
@@ -163,7 +163,7 @@ for line in sys.stdin:
 ''')
         fake.chmod(0o755)
         os.environ["PI_SIDEBAR_PI"] = str(fake)
-        cls.a = sidebar.tmux("new-session", "-d", "-s", "host", "-x", "120", "-y", "34", "-P", "-F", "#{pane_id}",
+        cls.a = sidebar.tmux("new-session", "-d", "-s", "host", "-x", "120", "-y", "24", "-P", "-F", "#{pane_id}",
                              "-c", cls.cwd, f"{fake} --session {cls.files[0]}")
         sidebar.tmux("set-option", "-g", "default-terminal", "tmux-256color")
         sidebar.tmux("set-option", "-g", "pane-base-index", "1")
@@ -177,7 +177,7 @@ for line in sys.stdin:
         cls.client, cls.master = pty.fork()
         if cls.client == 0:
             os.execvp("tmux", ["tmux", "attach-session", "-t", "host"])
-        fcntl.ioctl(cls.master, termios.TIOCSWINSZ, struct.pack("HHHH", 34, 120, 0, 0))
+        fcntl.ioctl(cls.master, termios.TIOCSWINSZ, struct.pack("HHHH", 24, 120, 0, 0))
         cls.wait(lambda: bool(sidebar.tmux("list-clients", "-F", "#{client_tty}")))
         cls.wait(lambda: "全部会话" in cls.capture(cls.sidebar))
         assert sidebar.tmux("display-message", "-p", "-t", cls.sidebar, "#{mouse_sgr_flag}") == "1"
@@ -244,7 +244,7 @@ for line in sys.stdin:
         self.assertIn("KEEP_CTRL_G", sidebar.tmux("list-keys", "-T", "root", "C-g"))
         # 复现用户的已退出窄栏：再次打开必须恢复 UI，并保留右侧 Pi。
         self.click(21, 1)
-        self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "3")
+        self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "5")
         sidebar.tmux("respawn-pane", "-k", "-t", self.sidebar, "false")
         self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_dead}") == "1")
         w.state = sidebar.read(w.state_file, {})
@@ -254,9 +254,11 @@ for line in sys.stdin:
         self.assertEqual(w.right(), self.a)
         # 真正向附着的 tmux 客户端发送鼠标事件，验证转发与命中。
         self.click(21, 1)
-        self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "3")
-        self.wait(lambda: self.capture(self.sidebar).splitlines()[0].strip() == ">")
-        self.click(0, 0)
+        self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "5")
+        self.wait(lambda: "›" in self.capture(self.sidebar).splitlines()[1])
+        screen = self.capture(self.sidebar).splitlines()
+        self.assertEqual([screen[y].index(glyph) for y, glyph in ((1, "›"), (4, "+"), (7, "×"))], [2, 2, 2])
+        self.click(2, 1)
         self.wait(lambda: sidebar.tmux("display-message", "-p", "-t", self.sidebar, "#{pane_width}") == "28")
         self.wait(lambda: "全部会话" in self.capture(self.sidebar))
         os.write(self.master, b"\x1b[<65;6;7M")
@@ -272,9 +274,10 @@ for line in sys.stdin:
         sidebar.tmux("select-pane", "-t", self.sidebar)
         self.wait(lambda: "运行21" in self.capture(self.sidebar))
         row = next(i for i, line in enumerate(self.capture(self.sidebar).splitlines()) if "运行21" in line)
-        self.click(23, row - 1)
+        self.click(24, row)
         self.wait(lambda: str(self.files[21]) in sidebar.read(w.pins_file, []))
-        self.wait(lambda: "运行21" in "\n".join(self.capture(self.sidebar).splitlines()[6:7]))
+        self.wait(lambda: "📌" in self.capture(self.sidebar))
+        self.wait(lambda: "运行21" in "\n".join(self.capture(self.sidebar).splitlines()[4:5]))
         self.assertIn("📌", self.capture(self.sidebar))
         self.assertNotIn("☆", self.capture(self.sidebar))
         self.assertNotIn("后台", self.capture(self.sidebar))
@@ -292,7 +295,7 @@ for line in sys.stdin:
         self.assertEqual(w.right(), c, "右键和菜单置顶不切换当前会话")
         screen = self.capture(self.sidebar).splitlines()
         divider = next(i for i, line in enumerate(screen) if "其他会话" in line)
-        self.assertEqual(screen[divider - 1].strip(), "", "置顶与非置顶之间留一行")
+        self.assertEqual(screen[divider - 1].rstrip(" ▌█"), "", "置顶与非置顶之间留一行")
         # 删除置顶历史会清除置顶，并把原始文件放到可恢复目录。
         self.click(6, self.line("历史会话新标题"), button=2)
         self.choose("删除会话")
@@ -344,7 +347,7 @@ for line in sys.stdin:
         self.wait(lambda: "Enter 保存" not in self.capture(self.sidebar))
         self.assertEqual(sidebar.read(w.titles_file, {})[str(self.files[21])], "自定义标题")
         sidebar.tmux("select-pane", "-t", self.sidebar)
-        self.click(25, 1)
+        self.click(26, 1)
         self.wait(lambda: sidebar.read(w.state_file, None) == {})
         self.assertEqual(sidebar.tmux("display-message", "-p", "-t", self.a, "#{window_id}"), self.original)
         self.assertEqual(sidebar.tmux("show-options", "-t", "host", "-v", "mouse"), "off")
@@ -354,7 +357,7 @@ for line in sys.stdin:
         w.state = {}
         w.open(self.a)
         type(self).sidebar = w.state["sidebar"]
-        self.wait(lambda: "自定义标题" in "\n".join(self.capture(self.sidebar).splitlines()[6:7]))
+        self.wait(lambda: "自定义标题" in "\n".join(self.capture(self.sidebar).splitlines()[4:5]))
         w.activate({"key": str(self.files[21]), "file": str(self.files[21]), "cwd": str(self.cwd)})
         self.wait(lambda: "自定义标题" in self.capture(self.sidebar))
         time.sleep(1.1)  # 等待实际 UI 记录前台 Pi 的进程身份。

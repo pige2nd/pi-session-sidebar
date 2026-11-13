@@ -17,6 +17,7 @@ import unicodedata
 HERE = Path(__file__).resolve().parent
 POOL = "_pi_sidebar_pool"
 OPTION = "@pi_sidebar"
+RAIL_BUTTONS = ((1, "›", "toggle", 1), (4, "+", "new", 1), (7, "×", "close", 5))
 
 
 def tmux(*args, check=True):
@@ -238,7 +239,7 @@ class Workspace:
 
     def toggle(self):
         self.state["collapsed"] = not self.state["collapsed"]
-        tmux("resize-pane", "-t", self.state["sidebar"], "-x", "3" if self.state["collapsed"] else "28")
+        tmux("resize-pane", "-t", self.state["sidebar"], "-x", "5" if self.state["collapsed"] else "28")
         self.commit()
 
     def running(self, row):
@@ -414,16 +415,16 @@ class Sidebar:
                 continue
             if self.layout:
                 self.layout.append(("gap", None))
-            self.layout.append(("heading", label))
+            self.layout.append(("heading", f"· {label} ·"))
             for row in rows:
-                parts = ["top", "title0"]
-                if len(title_lines(row["title"], self.screen.getmaxyx()[1] - 7)) > 1:
+                parts = ["title0"]
+                if len(title_lines(row["title"], self.screen.getmaxyx()[1] - 8)) > 1:
                     parts.append("title1")
-                self.layout.extend((part, row) for part in [*parts, "bottom"])
+                self.layout.extend((part, row) for part in parts)
         self.offset = min(self.offset, max(0, len(self.layout) - self.capacity()))
 
     def capacity(self):
-        return max(1, self.screen.getmaxyx()[0] - 5)
+        return max(1, self.screen.getmaxyx()[0] - 4)
 
     def put(self, y, x, text, attr=0):
         height, width = self.screen.getmaxyx()
@@ -439,32 +440,53 @@ class Sidebar:
         self.hits = {}
         height, width = self.screen.getmaxyx()
         if width <= 5:
-            for y, text in ((0, ">"), (2, "+"), (4, "x")):
-                self.put(y, 0, text, curses.color_pair(1) | curses.A_BOLD)
+            for y in range(height):
+                self.put(y, 0, "▏", curses.color_pair(3))
+            for y, text, _, color in RAIL_BUTTONS:
+                self.put(y, (width - 1) // 2, text, curses.color_pair(color))
+            if height > 8:
+                self.put(height - 2, max(1, (width - len(str(len(self.rows)))) // 2), str(len(self.rows)), curses.color_pair(4))
         else:
             self.put(1, 2, "会话", curses.color_pair(1) | curses.A_BOLD)
             self.put(1, 7, str(len(self.rows)), curses.color_pair(4))
-            self.put(1, width - 7, "‹   ×", curses.color_pair(4))
+            self.put(1, width - 7, "‹", curses.color_pair(4))
+            self.put(1, width - 2, "×", curses.color_pair(4))
             self.put(2, 2, "＋ 新会话", curses.color_pair(1))
-            for index, (part, row) in enumerate(self.layout[self.offset:self.offset + self.capacity()]):
-                y = 4 + index
+            capacity = self.capacity()
+            for index, (part, row) in enumerate(self.layout[self.offset:self.offset + capacity]):
+                y = 3 + index
                 if part == "heading":
                     self.put(y, 2, row, curses.color_pair(4))
-                elif part != "gap":
+                elif part == "gap":
+                    continue
+                else:
                     self.hits[y] = (row, part)
                     current = row["key"] == self.active
                     selected = row["key"] == self.selected
-                    border = curses.color_pair(1 if current or selected else 3)
-                    if part == "top":
-                        self.put(y, 1, "╭" + "─" * (width - 5) + "╮", border)
-                        self.put(y, width - 8, " 📌 ",
-                                 curses.color_pair(2 if row["key"] in self.pins else 3))
-                    elif part.startswith("title"):
-                        self.put(y, 1, "│" + " " * (width - 5) + "│", border)
-                        lines = title_lines(row["title"], width - 7)
-                        self.put(y, 3, lines[int(part[-1])], curses.color_pair(1) | curses.A_BOLD if current else curses.A_NORMAL)
-                    else:
-                        self.put(y, 1, "╰" + "─" * (width - 5) + "╯", border)
+                    pinned = row["key"] in self.pins
+                    badge = "●" if row.get("busy") else "○" if row.get("pane") else " "
+                    badge_attr = curses.color_pair(2 if row.get("busy") else 1) | (
+                        curses.A_BOLD if row.get("busy") else 0)
+                    lines = title_lines(row["title"], width - 8)
+                    text = lines[int(part[-1])]
+                    attr = (curses.color_pair(1) | curses.A_BOLD) if current else curses.A_NORMAL
+                    if selected:
+                        # 整行背景高亮：补齐空格，让反色横贯卡片。
+                        text = clip(text + " " * width, max(2, width - 6))
+                        attr |= curses.A_REVERSE
+                    if current:
+                        self.put(y, 1, "▎", curses.color_pair(1) | curses.A_BOLD)
+                    self.put(y, 3, badge, badge_attr)
+                    self.put(y, 5, text, attr)
+                    if part == "title0" and pinned:
+                        self.put(y, width - 4, "📌", curses.color_pair(2))
+            if len(self.layout) > capacity:
+                span = len(self.layout) - capacity
+                thumb = 3 + int(self.offset / span * (capacity - 1))
+                for index in range(capacity):
+                    y = 3 + index
+                    self.put(y, width - 2, "█" if y == thumb else "▌",
+                             curses.color_pair(1) if y == thumb else curses.color_pair(3))
             self.put(height - 1, 1, self.message or "右键 操作  ·  滚轮 浏览", curses.color_pair(4))
         if self.menu:
             self.draw_menu()
@@ -489,11 +511,11 @@ class Sidebar:
         lines = 9 if menu["confirm"] else 8
         x, y = max(0, min(menu["x"], width - size - 1)), max(0, min(menu["y"], height - lines - 1))
         menu["rect"] = (x, y, size, lines)
-        border = curses.color_pair(1)
+        border = curses.color_pair(3)
         for offset in range(lines):
             self.put(y + offset, x, "│" + " " * (size - 2) + "│", border)
-        self.put(y, x, "╭" + "─" * (size - 2) + "╮", border)
-        self.put(y + lines - 1, x, "╰" + "─" * (size - 2) + "╯", border)
+        self.put(y, x, "┌" + "─" * (size - 2) + "┐", border)
+        self.put(y + lines - 1, x, "└" + "─" * (size - 2) + "┘", border)
         self.put(y + 1, x + 2, shorten("删除会话？" if menu["confirm"] else menu["row"]["title"], size - 4), curses.A_BOLD)
         if menu["confirm"]:
             self.put(y + 2, x + 2, "结束 Pi，移入回收站", curses.color_pair(4))
@@ -503,9 +525,10 @@ class Sidebar:
         menu["targets"] = {}
         for index, (action, label, enabled) in enumerate(self.menu_items()):
             line = y + divider + 1 + index
-            marker = "› " if index == menu["selected"] else "  "
+            marker = "▎" if index == menu["selected"] else " "
             color = 3 if not enabled else 5 if action in ("remove", "delete") else 1 if index == menu["selected"] else 0
-            self.put(line, x + 1, clip(marker + label + " " * size, size - 2), curses.color_pair(color))
+            attr = curses.color_pair(color) | (curses.A_BOLD if index == menu["selected"] and enabled else 0)
+            self.put(line, x + 1, clip(marker + label + " " * size, size - 2), attr)
             menu["targets"][line] = (action, enabled)
 
     def menu_action(self, action):
@@ -546,16 +569,16 @@ class Sidebar:
         x, y = max(0, min(menu["x"], width - size - 1)), max(0, min(menu["y"], height - lines - 1))
         menu["rect"] = (x, y, size, lines)
         for offset in range(lines):
-            self.put(y + offset, x, "│" + " " * (size - 2) + "│", curses.color_pair(1))
-        self.put(y, x, "╭" + "─" * (size - 2) + "╮", curses.color_pair(1))
+            self.put(y + offset, x, "│" + " " * (size - 2) + "│", curses.color_pair(3))
+        self.put(y, x, "┌" + "─" * (size - 2) + "┐", curses.color_pair(3))
         self.put(y + 1, x + 2, "修改标题", curses.A_BOLD)
         display = clip(menu["text"][::-1], size - 6)[::-1]
         self.put(y + 2, x + 2, "> " + display, curses.A_REVERSE if menu["replace"] else curses.A_BOLD)
         self.put(y + 3, x + 2, "Enter 保存 · Esc 取消", curses.color_pair(4))
-        self.put(y + 4, x, "├" + "─" * (size - 2) + "┤", curses.color_pair(1))
+        self.put(y + 4, x, "├" + "─" * (size - 2) + "┤", curses.color_pair(3))
         self.put(y + 5, x + 2, "保存", curses.color_pair(1))
         self.put(y + 6, x + 2, "取消", curses.color_pair(4))
-        self.put(y + 7, x, "╰" + "─" * (size - 2) + "╯", curses.color_pair(1))
+        self.put(y + 7, x, "└" + "─" * (size - 2) + "┘", curses.color_pair(3))
         menu["targets"] = {y + 5: ("save", True), y + 6: ("cancel", True)}
         cells = sum(2 if unicodedata.east_asian_width(char) in "WF" else 1 for char in display)
         self.screen.move(y + 2, min(x + 4 + cells, x + size - 2))
@@ -633,18 +656,24 @@ class Sidebar:
                     self.menu = {"row": hit[0].copy(), "x": x, "y": y, "selected": 0, "confirm": False}
             elif buttons & (curses.BUTTON1_RELEASED | curses.BUTTON1_CLICKED |
                             curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_TRIPLE_CLICKED):
-                if (width <= 5 and y == 0) or (width > 5 and y == 1 and width - 7 <= x < width - 3):
+                if width <= 5:
+                    for row, _, action, _ in RAIL_BUTTONS:
+                        if x >= 1 and abs(y - row) <= 1:
+                            getattr(self.workspace, action)()
+                            break
+                    return
+                if y == 1 and width - 7 <= x < width - 3:
                     self.workspace.toggle()
-                elif (width <= 5 and y == 4) or (width > 5 and y == 1 and x >= width - 3):
+                elif y == 1 and x >= width - 3:
                     self.workspace.close()
-                elif (width <= 5 and y == 2) or (width > 5 and y == 2):
+                elif y == 2:
                     self.workspace.new()
                 elif width > 5:
                     hit = self.hits.get(y)
                     if hit:
                         row, part = hit
                         self.selected = row["key"]
-                        if part == "top" and x >= width - 8:
+                        if part == "title0" and x >= width - 6:
                             self.pin(row)
                         else:
                             self.workspace.activate(row)
@@ -660,8 +689,8 @@ class Sidebar:
             current = max(0, min(len(keys) - 1, current + (1 if key in (curses.KEY_DOWN, "j") else -1)))
             if keys:
                 self.selected = keys[current]
-                line = next(i for i, (part, row) in enumerate(self.layout) if part == "top" and row["key"] == self.selected)
-                end = line + 2 + len(title_lines(self.rows[current]["title"], width - 7))
+                line = next(i for i, (part, row) in enumerate(self.layout) if part == "title0" and row["key"] == self.selected)
+                end = line + len(title_lines(self.rows[current]["title"], width - 8))
                 self.offset = min(max(self.offset, end - self.capacity()), line)
         elif key in ("\n", " "):
             row = next((r for r in self.rows if r["key"] == self.selected), None)
