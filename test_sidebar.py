@@ -136,7 +136,6 @@ class TmuxTest(unittest.TestCase):
                           XDG_STATE_HOME=str(cls.root / "state"),
                           PI_CODING_AGENT_SESSION_DIR=str(cls.root / "sessions"),
                           TERM="xterm-256color", SHELL="/bin/sh")
-        os.environ['PI_SIDEBAR_DEBUG_MOUSE'] = str(cls.root / 'mouse.log')
         os.environ.pop("TMUX", None)
         os.environ.pop("TMUX_PANE", None)
         cls.cwd = cls.root / "项目 有空格 ' $"
@@ -211,7 +210,6 @@ for line in sys.stdin:
                 return
             time.sleep(0.04)
         if hasattr(cls, "sidebar"):
-            print((cls.root / 'mouse.log').read_text() if (cls.root / 'mouse.log').exists() else 'NO MOUSE')
             print("SIDEBAR", cls.capture(cls.sidebar))
             print("STATE", sidebar.read(cls.workspace.state_file, {}))
             print("PANES", sidebar.tmux("list-panes", "-a", "-F", "#{pane_id} #{pane_width}x#{pane_height} #{pane_dead} #{pane_current_command}"))

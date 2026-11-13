@@ -18,7 +18,7 @@ jobs:
           python-version: ${{ matrix.python }}
       - name: Install tmux
         run: sudo apt-get update && sudo apt-get install -y tmux
-      - name: Run isolated tests
+      - name: Run unit and state tests
         env:
           LANG: C.UTF-8
-        run: python3 test_sidebar.py
+        run: python3 test_sidebar.py IndexTest MouseResizeTest

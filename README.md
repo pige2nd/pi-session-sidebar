@@ -9,7 +9,7 @@
 - Linux，或 Windows 下的 WSL；目前不支持原生 Windows 和 macOS。
 - Pi 1.5.0 或更高版本及其要求的 Node.js；已验证 Pi 1.5.0。
 - Python 3.10+，需包含标准库 curses。
-- tmux；本机验证版本为 3.5a，CI 在 Ubuntu 上运行隔离测试。
+- tmux；完整交互已在本地使用 3.4 和 3.5a 验证。
 - 支持 UTF-8 和鼠标的终端。开发环境为 Alacritty + WSL。
 
 ```sh
@@ -91,9 +91,19 @@ pi remove git:github.com/pige2nd/pi-session-sidebar
 
 ## 验证
 
+GitHub CI 在 Python 3.11 / 3.13 上运行索引、标题和鼠标事件单元测试：
+
+```sh
+python3 test_sidebar.py IndexTest MouseResizeTest
+```
+
+完整鼠标交互测试使用真实 PTY 和独立 tmux socket，请在本机终端运行：
+
 ```sh
 python3 test_sidebar.py
 ```
+
+GitHub 托管运行器的合成右键事件未稳定到达 ncurses，因此完整 PTY 测试保留在默认本地测试中。完整交互的验证范围是上述本地 tmux 版本与 Alacritty + WSL 环境。
 
 测试使用独立 tmux socket 和模拟 Pi 进程，验证失效鼠标通知与尺寸变化、已退出窄栏的重新展开、标题换行与改名保存／取消、折叠/展开、历史恢复、置顶持久化和分区间隔、右键菜单、删除历史、运行会话删除的确认和取消、回收目录、会话复用、Pi 自己切换 session 后的恢复、退出后重开、关闭还原和后台存活。另已用原生 Pi 及当前全局扩展验证 Starline 胶囊和 Tidy 右对齐；没有发送模型请求。
 
