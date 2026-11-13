@@ -66,7 +66,7 @@ class MouseResizeTest(unittest.TestCase):
         dimensions = [34, 28]
         panel.screen = Mock()
         panel.screen.getmaxyx.side_effect = lambda: tuple(dimensions)
-        queue = [(0, 0, 0, 0, sidebar.curses.BUTTON1_PRESSED)]
+        queue = [(0, 0, 0, 0, sidebar.curses.BUTTON1_CLICKED)]
 
         def resize(height, width):
             dimensions[:] = [height, width]
@@ -90,6 +90,20 @@ class MouseResizeTest(unittest.TestCase):
         with patch.object(sidebar.os, "get_terminal_size", return_value=os.terminal_size((28, 34))), \
              patch.object(sidebar.curses, "getmouse", side_effect=sidebar.curses.error("getmouse() returned ERR")):
             panel.event(sidebar.curses.KEY_MOUSE)
+
+    def test_release_after_expired_press_can_expand_sidebar(self):
+        panel = sidebar.Sidebar.__new__(sidebar.Sidebar)
+        panel.workspace = Mock()
+        panel.menu = None
+        panel.screen = Mock()
+        panel.screen.getmaxyx.return_value = (34, 3)
+        with patch.object(sidebar.os, "get_terminal_size", return_value=os.terminal_size((3, 34))), \
+             patch.object(sidebar.curses, "getmouse", side_effect=[
+                 sidebar.curses.error("getmouse() returned ERR"),
+                 (0, 0, 0, 0, sidebar.curses.BUTTON1_RELEASED)]):
+            panel.event(sidebar.curses.KEY_MOUSE)
+            panel.event(sidebar.curses.KEY_MOUSE)
+        panel.workspace.toggle.assert_called_once()
 
 
 class TmuxTest(unittest.TestCase):

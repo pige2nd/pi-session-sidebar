@@ -578,7 +578,7 @@ class Sidebar:
             return
         if mouse:
             x, y, buttons = mouse
-            if buttons & (curses.BUTTON1_PRESSED | curses.BUTTON1_CLICKED |
+            if buttons & (curses.BUTTON1_RELEASED | curses.BUTTON1_CLICKED |
                           curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_TRIPLE_CLICKED):
                 left, top, width, height = self.menu["rect"]
                 if left <= x < left + width and top <= y < top + height:
@@ -625,13 +625,13 @@ class Sidebar:
             if buttons & (curses.BUTTON4_PRESSED | getattr(curses, "BUTTON5_PRESSED", 0)):
                 delta = -1 if buttons & curses.BUTTON4_PRESSED else 1
                 self.offset = max(0, min(self.offset + delta * 3, max(0, len(self.layout) - self.capacity())))
-            elif buttons & (curses.BUTTON3_PRESSED | curses.BUTTON3_CLICKED |
+            elif buttons & (curses.BUTTON3_RELEASED | curses.BUTTON3_CLICKED |
                             curses.BUTTON3_DOUBLE_CLICKED | curses.BUTTON3_TRIPLE_CLICKED):
                 hit = self.hits.get(y)
                 if hit:
                     self.selected = hit[0]["key"]
                     self.menu = {"row": hit[0].copy(), "x": x, "y": y, "selected": 0, "confirm": False}
-            elif buttons & (curses.BUTTON1_PRESSED | curses.BUTTON1_CLICKED |
+            elif buttons & (curses.BUTTON1_RELEASED | curses.BUTTON1_CLICKED |
                             curses.BUTTON1_DOUBLE_CLICKED | curses.BUTTON1_TRIPLE_CLICKED):
                 if (width <= 5 and y == 0) or (width > 5 and y == 1 and width - 7 <= x < width - 3):
                     self.workspace.toggle()
